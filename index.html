@@ -3,215 +3,163 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>凝聚｜首次體驗預約｜回饋表單</title>
+  <title>凝聚｜首次體驗預約</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
   <style>
-    /* 基礎設定 */
     body { 
-      margin: 0; 
-      font-family: system-ui, -apple-system, sans-serif; 
-      background: #f8fafc; 
-      height: 100vh; 
-      overflow: hidden; 
-      /* 防止 iOS 彈性捲動 */
-      overscroll-behavior-y: none; 
+      margin: 0; font-family: system-ui, -apple-system, sans-serif; 
+      background: #f8fafc; height: 100vh; overflow: hidden; 
     }
     
-    /* 加入淡入淡出動畫，讓切換更滑順 */
-    .container { 
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      display: flex; 
-      flex-direction: column; align-items: center; justify-content: center; 
+    /* 滿版提示畫面 (處理中 / 成功) */
+    .screen { 
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+      background: #f8fafc; z-index: 50; 
+      display: none; flex-direction: column; align-items: center; justify-content: center; 
       text-align: center; padding: 20px; box-sizing: border-box;
-      background: #f8fafc;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
-      z-index: 10;
     }
+    .screen.active { display: flex; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-    /* 啟用狀態的 Class */
-    .container.active {
-      opacity: 1;
-      visibility: visible;
-      z-index: 20;
-    }
-
-    /* 1. 載入中畫面 */
-    #loadingScreen { color: #64748b; font-size: 15px; z-index: 50; } /* Loading 永遠在最上層 */
+    /* 載入動畫 */
     .spinner { 
-      width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top: 4px solid #06c755; 
-      border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; 
+      width: 45px; height: 45px; border: 4px solid #e2e8f0; border-top: 4px solid #06c755; 
+      border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; 
     }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .status-text { color: #64748b; font-size: 16px; font-weight: 500; }
 
-    /* 2. 登入引導頁 */
-    .icon-box { 
-      width: 90px; height: 90px; background: #06c755; border-radius: 24px; margin-bottom: 24px; 
-      display: flex; align-items: center; justify-content: center; 
-      box-shadow: 0 10px 20px rgba(6, 199, 85, 0.2); 
-    }
-    .icon-box svg { width: 45px; height: 45px; fill: white; }
-    h1 { font-size: 22px; color: #1e293b; margin: 0 0 12px; font-weight: 700; }
-    p { font-size: 15px; color: #64748b; margin: 0 0 32px; line-height: 1.6; max-width: 400px; }
-
-    .btn-main { 
-      display: block; width: 100%; max-width: 300px; padding: 16px 0; 
-      background-color: #06c755; color: white; 
-      border-radius: 50px; text-decoration: none; font-size: 16px; font-weight: bold; 
-      box-shadow: 0 4px 12px rgba(6, 199, 85, 0.3); 
-      cursor: pointer; border: none; outline: none; transition: all 0.2s; 
-    }
-    .btn-main:active { opacity: 0.9; transform: scale(0.98); }
-
-    /* 3. 發送成功畫面 */
+    /* 成功圖示 */
     .success-icon { 
       width: 80px; height: 80px; background: #06c755; border-radius: 50%; 
-      display: flex; align-items: center; justify-content: center; 
-      margin-bottom: 20px; box-shadow: 0 10px 20px rgba(6,199,85,0.2); 
+      display: flex; align-items: center; justify-content: center; margin-bottom: 20px; 
+      box-shadow: 0 10px 20px rgba(6,199,85,0.2); 
     }
     .success-icon svg { width: 40px; height: 40px; fill: white; }
+    h1 { font-size: 22px; color: #1e293b; margin: 0 0 12px; }
+    p { font-size: 15px; color: #64748b; margin: 0 0 32px; line-height: 1.6; }
 
-    /* 4. 表單 Iframe */
+    /* 表單 Iframe */
     #filloutFrame { 
       position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-      border: none; background: #fff; z-index: 15; 
-      opacity: 0; visibility: hidden; transition: opacity 0.3s;
+      border: none; background: #fff; z-index: 10; display: none; 
     }
-    #filloutFrame.active { opacity: 1; visibility: visible; }
+    #filloutFrame.active { display: block; }
   </style>
 </head>
 <body>
 
-  <div id="loadingScreen" class="container active">
+  <div id="loadingScreen" class="screen active">
     <div class="spinner"></div>
-    <div id="loadingText">系統連線中...</div>
+    <div class="status-text" id="loadingMsg">系統連線中...</div>
   </div>
 
-  <div id="loginLanding" class="container">
-    <div class="icon-box">
-      <svg viewBox="0 0 24 24"><path d="M21.6 11.2c0-4.6-4.3-8.4-9.6-8.4S2.4 6.6 2.4 11.2c0 4.1 3.6 7.6 8.4 8.2v0.1l-1.2 3.8c-0.1 0.4 0.2 0.7 0.5 0.7 0.2 0 0.3-0.1 0.4-0.1l4.9-3.4h0.1c3.5-0.6 6.1-4.1 6.1-8.3z"/></svg>
-    </div>
-    <h1>首次體驗預約</h1>
-    <p>為了提供更完整的服務<br>請授權登入 LINE 帳號以繼續預約</p>
-    <button id="loginBtn" class="btn-main">以 LINE 登入並預約</button>
-  </div>
-
-  <div id="successScreen" class="container">
+  <div id="successScreen" class="screen">
     <div class="success-icon">
       <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
     </div>
-    <h1>小編收到你的預約囉！</h1>
-    <p>請回到聊天室確認是否成功發送<br>【首次體驗預約資料】<br><br>如無，請提醒小編已完成填寫<br>我們將盡快與您確認資訊</p>
-    <button onclick="liff.closeWindow()" class="btn-main" style="background:#64748b">關閉視窗</button>
+    <h1>預約資料已送出！</h1>
+    <p>請於聊天室確認您的預約明細<br>小編將盡快與您聯繫</p>
   </div>
 
-  <iframe id="filloutFrame" title="表單"></iframe>
+  <iframe id="filloutFrame" title="預約表單"></iframe>
 
   <script>
-    /***** 設定區域 *****/
     const LIFF_ID = "2001467446-KNVd49W2";
     const LINE_OA_ID = "@biu5388t"; 
     const FILL_OUT_BASE_URL = "https://cicostudio.fillout.com/t/s2Q1z59UH1us";
-    /********************/
 
-    const loadingScreen = document.getElementById('loadingScreen');
-    const loadingText = document.getElementById('loadingText');
-    const loginLanding = document.getElementById('loginLanding');
-    const successScreen = document.getElementById('successScreen');
-    const iframe = document.getElementById('filloutFrame');
-
-    // 加入 CSS Fade 轉場的狀態切換
-    function showState(state) {
-      document.querySelectorAll('.container, #filloutFrame').forEach(el => el.classList.remove('active'));
-      
-      if (state === 'loading') loadingScreen.classList.add('active');
-      else if (state === 'landing') loginLanding.classList.add('active');
-      else if (state === 'success') successScreen.classList.add('active');
-      else if (state === 'form') iframe.classList.add('active');
+    // 切換畫面邏輯
+    function switchScreen(screenId) {
+      document.getElementById('loadingScreen').classList.remove('active');
+      document.getElementById('successScreen').classList.remove('active');
+      document.getElementById('filloutFrame').classList.remove('active');
+      document.getElementById(screenId).classList.add('active');
     }
 
-    // 發送訊息流程
-    async function sendMessageToOA(params) {
-      showState('loading');
-      loadingText.innerText = "資料傳送中，請稍候...";
-
-      const name = params.get('name') || "貴賓";
-      const phone = params.get('phone') || "未填寫";
-      const location = params.get('location') || "未填寫";
-      const datetime = params.get('datetime') || "未填寫";
-      const referer = params.get('referer') || "無";
-      const promocamp = params.get('promocamp') || "無";
-
-      const messageText = `【首次體驗預約資料】\n小編會盡快和您確認預約時段～\n\n．姓名： ${name}\n．電話： ${phone}\n．門市： ${location}\n．希望日期／時段： ${datetime}\n．介紹人： ${referer}\n．活動／優惠： ${promocamp}`;
-
-      try {
-        if (!liff.isInClient()) throw new Error("外部瀏覽器無法使用 sendMessages");
-        
-        await liff.sendMessages([{ type: 'text', text: messageText }]);
-        
-        showState('success');
-        // 加長一點點時間，讓使用者看清楚成功畫面
-        setTimeout(() => liff.closeWindow(), 3500);
-
-      } catch (err) {
-        console.warn('改用備案轉址:', err);
-        const encodedText = encodeURIComponent(messageText);
-        window.location.replace(`https://line.me/R/oaMessage/${LINE_OA_ID}/?${encodedText}`);
-      }
+    // 更新 Loading 文字
+    function setLoadingText(text) {
+      document.getElementById('loadingMsg').innerText = text;
     }
 
-    // 載入表單
-    function loadForm(userId) {
-      const url = new URL(FILL_OUT_BASE_URL);
-      if(userId) url.searchParams.set('userid', userId);
-      
-      iframe.src = url.toString();
-      
-      // 等待 iframe 載入完成後再切換畫面，避免白畫面閃爍
-      iframe.onload = () => {
-        showState('form');
-      };
+    // 備案機制：外部瀏覽器無法發送時，轉跳進入 LINE 官方帳號對話框
+    function fallbackToLineOA(messageText) {
+      const encodedText = encodeURIComponent(messageText);
+      window.location.replace(`https://line.me/R/oaMessage/${LINE_OA_ID}/?${encodedText}`);
     }
 
-    // 主程式入口
     async function main() {
       try {
         await liff.init({ liffId: LIFF_ID });
 
+        // 1. 抓取網址參數
         const params = new URLSearchParams(window.location.search);
-        
-        // 1. 如果是送出後的回傳 (最高優先級，保持在 Loading 狀態處理)
-        if (params.get('action') === 'submit_done') {
-            await sendMessageToOA(params);
-            return;
+        const action = params.get('action');
+
+        // 如果未登入，強制要求登入 (確保能抓到身分或傳送訊息)
+        if (!liff.isLoggedIn()) {
+          liff.login({ redirectUri: window.location.href });
+          return;
         }
 
-        // 2. 判斷登入狀態
-        if (liff.isLoggedIn()) {
-          const profile = await liff.getProfile();
-          loadForm(profile.userId);
-        } else {
-          // 若在 LINE App 內，自動登入；若在外部，則顯示點擊按鈕登入
+        /* ＝＝＝＝＝ 模式 A：學員點擊了送出按鈕 (發送訊息) ＝＝＝＝＝ */
+        if (action === 'submit_done') {
+          setLoadingText("正在拋轉預約資料至 LINE...");
+
+          // 清洗與組合參數
+          const data = {
+              name: params.get('name') || "未提供",
+              phone: params.get('phone') || "未提供",
+              location: params.get('location') || "未指定",
+              trainer: params.get('trainer') || "未指定",
+              datetime: params.get('datetime') || "未指定",
+              referer: params.get('referer') || "無",
+              promocamp: params.get('promocamp') || "無"
+          };
+
+          const messageText = `【首次體驗預約資料】\n小編會盡快和您確認預約時段～\n\n．姓名： ${data.name}\n．電話： ${data.phone}\n．門市： ${data.location}\n．教練： ${data.trainer}\n．希望日期／時段： ${data.datetime}\n．介紹人： ${data.referer}\n．活動／優惠： ${data.promocamp}`;
+
           if (liff.isInClient()) {
-            liff.login({ redirectUri: window.location.href });
+              try {
+                  // 在 LINE 內部，靜默發送訊息
+                  await liff.sendMessages([{ type: 'text', text: messageText }]);
+                  switchScreen('successScreen');
+                  // 顯示成功畫面 2.5 秒後自動關閉，讓學員回到對話框
+                  setTimeout(() => liff.closeWindow(), 2500);
+              } catch (err) {
+                  console.warn("sendMessages 失敗，啟動備案:", err);
+                  fallbackToLineOA(messageText);
+              }
           } else {
-            showState('landing');
-            document.getElementById('loginBtn').onclick = () => {
-               liff.login({ redirectUri: window.location.href });
-            };
+              // 外部瀏覽器點開，喚起 LINE App
+              setLoadingText("正在為您開啟 LINE...");
+              fallbackToLineOA(messageText);
           }
+          return;
         }
+
+        /* ＝＝＝＝＝ 模式 B：剛進來預約，沒有參數 (顯示 Fillout 表單) ＝＝＝＝＝ */
+        const profile = await liff.getProfile();
+        const url = new URL(FILL_OUT_BASE_URL);
+        // 把 UserId 偷塞進 Fillout 網址，這樣表單可以紀錄是誰填的 (若 Fillout 有設隱藏欄位 userid)
+        url.searchParams.set('userid', profile.userId); 
+        
+        const iframe = document.getElementById('filloutFrame');
+        iframe.src = url.toString();
+        
+        // 等待 Iframe 載入完畢再切換，避免白畫面
+        iframe.onload = () => {
+           switchScreen('filloutFrame');
+        };
 
       } catch (err) {
-        console.error('LIFF Init Error:', err);
-        alert("系統連線異常，將直接開啟表單");
-        loadForm(""); 
+        console.error('LIFF 初始化失敗:', err);
+        setLoadingText("系統連線異常，請重新操作。");
       }
     }
 
+    // 啟動主程式
     main();
   </script>
 </body>
