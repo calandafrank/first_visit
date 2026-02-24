@@ -1,315 +1,222 @@
-<!doctype html>
-<html lang="zh-Hant">
-
+<!DOCTYPE html>
+<html lang="zh-TW">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>凝聚｜首次體驗預約｜回饋表單</title>
-  <link rel="preconnect" href="https://static.line-scdn.net">
-  <link rel="preconnect" href="https://cicostudio.fillout.com">
-  <script>
-    if (window.self !== window.top) { window.top.location.href = window.location.href; }
-  </script>
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js" defer></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>首次體驗預約</title>
+    
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-  <style>
-    /* 基礎設定 */
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, sans-serif;
-      background: #f8fafc;
-      height: 100vh;
-      overflow: hidden;
-    }
+    <style>
+        /* 重置與鎖定外層滾動 */
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; /* 關鍵：避免外層出現捲軸 */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f9f9f9;
+        }
 
-    /* 共用容器設定 (預設隱藏，由 JS 控制顯示) */
-    .container {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      text-align: center;
-      padding: 20px;
-      box-sizing: border-box;
-    }
+        /* 滿版容器共用設定 */
+        .fullscreen-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background-color: #ffffff; z-index: 10;
+            transition: opacity 0.4s ease, visibility 0.4s ease;
+        }
 
-    /* 1. 載入中畫面 */
-    #loadingScreen {
-      display: flex;
-      color: #64748b;
-      font-size: 14px;
-    }
+        /* 隱藏狀態 */
+        .hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 4px solid #e2e8f0;
-      border-top: 4px solid #06c755;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 16px;
-    }
+        /* Iframe 設定 */
+        #fillout-iframe {
+            width: 100vw; height: 100dvh; /* 使用 dvh 確保在手機瀏覽器高度精確 */
+            border: none; display: none;
+        }
 
-    @keyframes spin {
-      0% {
-        transform: rotate(0deg);
-      }
+        /* 載入動畫 (Spinner) */
+        .spinner {
+            border: 4px solid #f3f3f3; border-top: 4px solid #06C755; /* LINE 綠色 */
+            border-radius: 50%; width: 40px; height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-      100% {
-        transform: rotate(360deg);
-      }
-    }
-
-    /* 2. 登入引導頁 (桌機與手機未登入者通用) */
-    .icon-box {
-      width: 100px;
-      height: 100px;
-      background: #06c755;
-      border-radius: 24px;
-      margin-bottom: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 10px 20px rgba(6, 199, 85, 0.2);
-    }
-
-    .icon-box svg {
-      width: 50px;
-      height: 50px;
-      fill: white;
-    }
-
-    h1 {
-      font-size: 22px;
-      color: #1e293b;
-      margin: 0 0 12px;
-      font-weight: 700;
-    }
-
-    p {
-      font-size: 15px;
-      color: #64748b;
-      margin: 0 0 32px;
-      line-height: 1.6;
-      max-width: 400px;
-    }
-
-    .btn-main {
-      display: block;
-      width: 100%;
-      max-width: 320px;
-      padding: 16px 0;
-      background-color: #06c755;
-      color: white;
-      border-radius: 50px;
-      text-decoration: none;
-      font-size: 16px;
-      font-weight: bold;
-      box-shadow: 0 4px 12px rgba(6, 199, 85, 0.3);
-      cursor: pointer;
-      border: none;
-      outline: none;
-      transition: opacity 0.2s;
-    }
-
-    .btn-main:active {
-      opacity: 0.9;
-      transform: scale(0.98);
-    }
-
-    /* 3. 發送成功畫面 */
-    #successScreen {
-      color: #1e293b;
-    }
-
-    .success-icon {
-      width: 80px;
-      height: 80px;
-      background: #06c755;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 20px;
-      box-shadow: 0 10px 20px rgba(6, 199, 85, 0.2);
-    }
-
-    .success-icon svg {
-      width: 40px;
-      height: 40px;
-      fill: white;
-    }
-
-    /* 4. 表單 Iframe */
-    #filloutFrame {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      border: none;
-      background: #fff;
-      z-index: 100;
-      display: none;
-    }
-  </style>
+        /* 阻擋頁面 (QR Code 區域) */
+        .block-screen { text-align: center; padding: 20px; }
+        .block-screen h2 { color: #333; margin-bottom: 10px; }
+        .block-screen p { color: #666; margin-bottom: 30px; font-size: 14px; line-height: 1.5; }
+        #qrcode { margin: 0 auto 30px auto; padding: 15px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: fit-content; }
+        
+        /* 質感按鈕 */
+        .btn {
+            background-color: #06C755; color: white; text-decoration: none;
+            padding: 14px 28px; border-radius: 12px; font-weight: bold; font-size: 16px;
+            display: inline-block; transition: transform 0.2s ease, background-color 0.2s ease;
+        }
+        .btn:active { transform: scale(0.95); background-color: #05a044; }
+    </style>
 </head>
-
 <body>
 
-  <div id="loadingScreen" class="container">
-    <div class="spinner"></div>
-    <div id="loadingText">資料讀取中...</div>
-  </div>
-
-  <div id="loginLanding" class="container">
-    <!-- QR Code Image -->
-    <img src="https://qr-official.line.me/gs/M_biu5388t_GW.png?oat__id=6356535&oat_content=q&openExternalBrowser=1"
-      alt="加入好友" style="width: 200px; height: 200px; margin-bottom: 24px;">
-    <h1>首次體驗預約</h1>
-    <p>請加入官方 LINE 帳號進行預約</p>
-    <a href="https://lin.ee/5bVtI07?oat__id=6356535&oat_content=l&openExternalBrowser=1" class="btn-main"
-      style="text-align:center; box-sizing:border-box;">加入官方 LINE</a>
-  </div>
-
-  <div id="successScreen" class="container">
-    <div class="success-icon">
-      <svg viewBox="0 0 24 24">
-        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-      </svg>
+    <div id="loading-screen" class="fullscreen-overlay">
+        <div class="spinner"></div>
+        <p style="margin-top: 20px; color: #666;">載入中，請稍候...</p>
     </div>
-    <h1>小編收到你的預約囉！</h1>
-    <p>請回到對話確認是否成功發送<br>【首次體驗預約資料】<br><br>如無，請提醒小編已完成填寫<br>我們將盡快與您確認資訊</p>
-    <button onclick="liff.closeWindow()" class="btn-main" style="background:#64748b">關閉視窗</button>
-  </div>
 
-  <iframe id="filloutFrame" title="表單"></iframe>
+    <div id="qr-screen" class="fullscreen-overlay hidden">
+        <div class="block-screen">
+            <h2>請使用手機 LINE 開啟</h2>
+            <p>為了提供完整的預約服務，<br>請使用手機相機掃描下方 QR Code，<br>或點擊下方按鈕前往。</p>
+            <div id="qrcode"></div>
+            <a href="https://liff.line.me/2001467446-KNVd49W2" class="btn">前往 LINE 開啟</a>
+        </div>
+    </div>
 
-  <script>
+    <div id="success-screen" class="fullscreen-overlay hidden">
+        <div class="block-screen">
+            <h2 style="color: #06C755;">預約資料已送出！</h2>
+            <p>您現在可以關閉此視窗，<br>返回 LINE 聊天室查看您的預約明細。</p>
+            <button class="btn" onclick="liff.closeWindow()">關閉視窗</button>
+        </div>
+    </div>
 
-    /***** 設定區域 (請務必修改這裡) *****/
-    const LIFF_ID = "2001467446-KNVd49W2";
+    <iframe id="fillout-iframe"></iframe>
 
-    // 您的官方帳號 ID (開頭要加 @)
-    const LINE_OA_ID = "@biu5388t";
+    <script>
+        const LIFF_ID = "2001467446-KNVd49W2";
+        const LIFF_URL = `https://liff.line.me/${LIFF_ID}`;
 
-    // Fillout 網址
-    const FILL_OUT_BASE_URL = "https://cicostudio.fillout.com/t/s2Q1z59UH1us";
-    /*******************************************/
+        // 初始化
+        async function main() {
+            try {
+                await liff.init({ liffId: LIFF_ID });
 
-    // DOM 元素
-    const loadingScreen = document.getElementById('loadingScreen');
-    const loadingText = document.getElementById('loadingText');
-    const loginLanding = document.getElementById('loginLanding');
-    const successScreen = document.getElementById('successScreen');
-    const iframe = document.getElementById('filloutFrame');
+                // 檢查是否是從 Fillout 填完跳轉回來的 (方案A)
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('action') === 'completed') {
+                    await handleFormSubmit(urlParams);
+                    return; // 終止後續載入
+                }
 
-    // 狀態切換管理
-    function showState(state) {
-      // 隱藏全部
-      loadingScreen.style.display = 'none';
-      loginLanding.style.display = 'none';
-      successScreen.style.display = 'none';
-      iframe.style.display = 'none';
+                // 若非跳轉回來，則檢查環境
+                checkEnvironment();
 
-      // 顯示指定區塊
-      if (state === 'loading') loadingScreen.style.display = 'flex';
-      if (state === 'landing') loginLanding.style.display = 'flex';
-      if (state === 'success') successScreen.style.display = 'flex';
-      if (state === 'form') iframe.style.display = 'block';
-    }
-
-    // 發送訊息給官方帳號 (含 Fallback 機制)
-    async function sendMessageToOA(params) {
-      loadingText.innerText = "資料傳送中...";
-      showState('loading');
-
-      // 1. 抓取參數
-      const data = {
-        name: params.get('name') || "",
-        phone: params.get('phone') || "",
-        location: params.get('location') || "",
-        datetime: params.get('datetime') || "",
-        referer: params.get('referer') || "無",
-        promocamp: params.get('promocamp') || "無"
-      };
-
-      // 2. 組合訊息內容
-      const messageText = `【首次體驗預約資料】\n小編會盡快和您確認預約時段～\n\n．姓名： ${data.name}\n．電話： ${data.phone}\n．門市： ${data.location}\n．希望日期／時段： ${data.datetime}\n．介紹人： ${data.referer}\n．活動／優惠： ${data.promocamp}`;
-
-      try {
-        // 3. 嘗試使用 LIFF 隱形發送
-        if (!liff.isInClient()) throw new Error("外部瀏覽器無法使用 sendMessages");
-        await liff.sendMessages([{ type: 'text', text: messageText }]);
-        showState('success');
-        setTimeout(() => liff.closeWindow(), 3000);
-      } catch (err) {
-        console.warn('自動發送失敗，改用備案:', err);
-        // 4. 備案：轉址到聊天室
-        window.location.href = `https://line.me/R/oaMessage/${LINE_OA_ID}/?${encodeURIComponent(messageText)}`;
-      }
-    }
-
-    // 載入表單 iframe
-    function loadForm(userId) {
-      const url = new URL(FILL_OUT_BASE_URL);
-      if (userId) url.searchParams.set('userid', userId);
-      iframe.src = url.toString();
-      showState('form');
-    }
-
-    // 觸發登入
-    function triggerLogin() {
-      if (!liff.isLoggedIn()) {
-        liff.login({ redirectUri: window.location.href });
-      }
-    }
-
-    // 主程式入口
-    async function main() {
-      try {
-        await liff.init({ liffId: LIFF_ID });
-
-        // A. 檢查是否為填單完成回傳 (URL 帶有 action=submit_done)
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('action') === 'submit_done') {
-          if (!liff.isLoggedIn()) {
-            // 若意外未登入，先登入以利後續發送 (通常不會發生)
-            liff.login({ redirectUri: window.location.href });
-            return;
-          }
-          await sendMessageToOA(params);
-          return;
+            } catch (error) {
+                console.error("LIFF 初始化失敗", error);
+                alert("系統連線異常，請稍後再試。");
+            }
         }
 
-        // B. 偵測並處理外部瀏覽器 (非 LINE 環境 -> 強制顯示加好友)
-        if (!liff.isInClient()) {
-          showState('landing');
-          return;
+        // 處理表單完成的邏輯與防呆
+        async function handleFormSubmit(params) {
+            // 防呆機制：檢查 sessionStorage，避免使用者重整網頁導致重複發送
+            if (sessionStorage.getItem('message_sent') === 'true') {
+                showScreen('success-screen');
+                return;
+            }
+
+            // 組裝訊息字串 (對應您的參數需求)
+            const messageText = 
+`【首次體驗預約資料】
+．姓名： ${params.get('name') || '未填寫'}
+．電話： ${params.get('phone') || '未填寫'}
+
+．門市： ${params.get('location') || '未選擇'}
+．希望時段： ${params.get('datetime') || '未選擇'}
+．指名訓練師： ${params.get('trainer') || '無'}
+
+．活動優惠： ${params.get('promocamp') || '無'}
+．介紹人： ${params.get('referer') || '無'}`;
+
+            try {
+                // 確保在 LINE App 內才能發訊息
+                if (liff.isInClient()) {
+                    await liff.sendMessages([{ type: "text", text: messageText }]);
+                    // 寫入防呆標記
+                    sessionStorage.setItem('message_sent', 'true');
+                    // 關閉視窗
+                    liff.closeWindow();
+                } else {
+                    // 理論上不該發生，但若在外部環境完成，僅顯示成功畫面
+                    showScreen('success-screen');
+                }
+            } catch (error) {
+                console.error("發送訊息失敗", error);
+                // 就算發送失敗，也顯示成功畫面讓用戶能手動關閉
+                showScreen('success-screen');
+            }
         }
 
-        // C. LINE 環境內：檢查登入狀態
-        if (liff.isLoggedIn()) {
-          // 已登入 -> 顯示表單
-          const profile = await liff.getProfile();
-          loadForm(profile.userId);
-        } else {
-          // 未登入 -> 自動執行登入 (LINE 內會自動轉跳)
-          liff.login({ redirectUri: window.location.href });
+        // 檢查執行環境
+        function checkEnvironment() {
+            const os = liff.getOS(); // 回傳 ios, android, web, mac, windows
+            const isInClient = liff.isInClient();
+
+            // 如果是桌機環境 (web/mac/windows) 或不在 LINE 客戶端內
+            if (os === 'web' || os === 'mac' || os === 'windows' || !isInClient) {
+                generateQRCode(LIFF_URL);
+                showScreen('qr-screen');
+            } else {
+                // 是手機 LINE 環境，載入表單
+                loadFilloutIframe();
+            }
         }
 
-      } catch (err) {
-        console.error('LIFF Init Error:', err);
-        // 初始化失敗時的降級處理 -> 直接開表單
-        alert("系統連線異常，將直接開啟表單");
-        loadForm("");
-      }
-    }
+        // 載入 Fillout Iframe
+        async function loadFilloutIframe() {
+            // 雙重確認登入狀態
+            if (!liff.isLoggedIn()) {
+                liff.login();
+                return;
+            }
 
-    // 啟動
-    document.addEventListener('DOMContentLoaded', main);
-  </script>
+            try {
+                const profile = await liff.getProfile();
+                const userId = profile.userId;
+                
+                // 設定 Iframe 網址並帶入 userId
+                const iframe = document.getElementById('fillout-iframe');
+                iframe.src = `https://cicostudio.fillout.com/t/s2Q1z59UH1us?userid=${userId}`;
+                
+                // 顯示 Iframe，隱藏 Loading
+                iframe.style.display = 'block';
+                hideAllScreens(); // 隱藏所有滿版 overlay
+            } catch (error) {
+                console.error("無法獲取使用者資料", error);
+            }
+        }
+
+        // --- UI 控制輔助函式 ---
+        function showScreen(screenId) {
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('qr-screen').classList.add('hidden');
+            document.getElementById('success-screen').classList.add('hidden');
+            
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        function hideAllScreens() {
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('qr-screen').classList.add('hidden');
+            document.getElementById('success-screen').classList.add('hidden');
+        }
+
+        function generateQRCode(url) {
+            // 避免重複生成
+            document.getElementById("qrcode").innerHTML = "";
+            new QRCode(document.getElementById("qrcode"), {
+                text: url,
+                width: 180,
+                height: 180,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+        }
+
+        // 啟動程式
+        main();
+    </script>
 </body>
-
 </html>
