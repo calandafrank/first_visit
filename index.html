@@ -9,15 +9,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     <style>
-        /* 重置與鎖定外層滾動 */
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
-            overflow: hidden; /* 關鍵：避免外層出現捲軸 */
+            overflow: hidden; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background-color: #f9f9f9;
         }
 
-        /* 滿版容器共用設定 */
         .fullscreen-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -25,32 +23,27 @@
             transition: opacity 0.4s ease, visibility 0.4s ease;
         }
 
-        /* 隱藏狀態 */
         .hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 
-        /* Iframe 設定 */
         #fillout-iframe {
-            width: 100vw; height: 100dvh; /* 使用 dvh 確保在手機瀏覽器高度精確 */
+            width: 100vw; height: 100dvh; 
             border: none; display: none;
         }
 
-        /* 載入動畫 (Spinner) */
         .spinner {
-            border: 4px solid #f3f3f3; border-top: 4px solid #06C755; /* LINE 綠色 */
+            border: 4px solid #f3f3f3; border-top: 4px solid #06C755; 
             border-radius: 50%; width: 40px; height: 40px;
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* 阻擋頁面 (QR Code 區域) */
         .block-screen { text-align: center; padding: 20px; }
         .block-screen h2 { color: #333; margin-bottom: 10px; }
         .block-screen p { color: #666; margin-bottom: 30px; font-size: 14px; line-height: 1.5; }
         #qrcode { margin: 0 auto 30px auto; padding: 15px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: fit-content; }
         
-        /* 質感按鈕 */
         .btn {
-            background-color: #06C755; color: white; text-decoration: none;
+            background-color: #06C755; color: white; text-decoration: none; border: none; cursor: pointer;
             padding: 14px 28px; border-radius: 12px; font-weight: bold; font-size: 16px;
             display: inline-block; transition: transform 0.2s ease, background-color 0.2s ease;
         }
@@ -84,40 +77,46 @@
     <iframe id="fillout-iframe"></iframe>
 
     <script>
-        const LIFF_ID = "2001467446-KNVd49W2";
-        const LIFF_URL = `https://liff.line.me/${LIFF_ID}`;
+        // ==========================================
+        // 1. 破窗防呆機制 (Frame-busting)
+        // ==========================================
+        // 如果這個網頁發現自己被包在 Iframe 裡面 (例如 Fillout 跳轉回來時)
+        if (window !== window.top) {
+            // 強制把最外層的視窗導向目前的帶參數網址
+            window.top.location.href = window.location.href;
+        } else {
+            // 確定在最外層後，才開始執行 LIFF 主程式
+            const LIFF_ID = "2001467446-KNVd49W2";
+            const LIFF_URL = `https://liff.line.me/${LIFF_ID}`;
 
-        // 初始化
-        async function main() {
-            try {
-                await liff.init({ liffId: LIFF_ID });
+            async function main() {
+                try {
+                    await liff.init({ liffId: LIFF_ID });
 
-                // 檢查是否是從 Fillout 填完跳轉回來的 (方案A)
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('action') === 'completed') {
-                    await handleFormSubmit(urlParams);
-                    return; // 終止後續載入
+                    // 檢查是否是從 Fillout 填完跳轉回來的
+                    const urlParams = new URLSearchParams(window.location.search);
+                    if (urlParams.get('action') === 'completed') {
+                        await handleFormSubmit(urlParams);
+                        return; // 終止後續載入表單的動作
+                    }
+
+                    // 若非跳轉回來，則檢查環境 (判斷是否顯示 QR Code 或載入表單)
+                    checkEnvironment();
+
+                } catch (error) {
+                    console.error("LIFF 初始化失敗", error);
+                    alert("系統連線異常，請確認網路狀態或稍後再試。");
+                }
+            }
+
+            async function handleFormSubmit(params) {
+                // 檢查 sessionStorage，避免使用者重整網頁導致無限發送訊息
+                if (sessionStorage.getItem('message_sent') === 'true') {
+                    showScreen('success-screen');
+                    return;
                 }
 
-                // 若非跳轉回來，則檢查環境
-                checkEnvironment();
-
-            } catch (error) {
-                console.error("LIFF 初始化失敗", error);
-                alert("系統連線異常，請稍後再試。");
-            }
-        }
-
-        // 處理表單完成的邏輯與防呆
-        async function handleFormSubmit(params) {
-            // 防呆機制：檢查 sessionStorage，避免使用者重整網頁導致重複發送
-            if (sessionStorage.getItem('message_sent') === 'true') {
-                showScreen('success-screen');
-                return;
-            }
-
-            // 組裝訊息字串 (對應您的參數需求)
-            const messageText = 
+                const messageText = 
 `【首次體驗預約資料】
 ．姓名： ${params.get('name') || '未填寫'}
 ．電話： ${params.get('phone') || '未填寫'}
@@ -129,94 +128,80 @@
 ．活動優惠： ${params.get('promocamp') || '無'}
 ．介紹人： ${params.get('referer') || '無'}`;
 
-            try {
-                // 確保在 LINE App 內才能發訊息
-                if (liff.isInClient()) {
-                    await liff.sendMessages([{ type: "text", text: messageText }]);
-                    // 寫入防呆標記
-                    sessionStorage.setItem('message_sent', 'true');
-                    // 關閉視窗
-                    liff.closeWindow();
-                } else {
-                    // 理論上不該發生，但若在外部環境完成，僅顯示成功畫面
+                try {
+                    if (liff.isInClient()) {
+                        await liff.sendMessages([{ type: "text", text: messageText }]);
+                        sessionStorage.setItem('message_sent', 'true');
+                        liff.closeWindow();
+                    } else {
+                        showScreen('success-screen');
+                    }
+                } catch (error) {
+                    console.error("發送訊息失敗", error);
+                    // 加入除錯提醒：通常是 LINE Developers 後台沒開 chat_message.write 權限
+                    alert("發送明細失敗，請開發者確認後台 chat_message.write 權限是否開啟。錯誤代碼：" + error.message);
                     showScreen('success-screen');
                 }
-            } catch (error) {
-                console.error("發送訊息失敗", error);
-                // 就算發送失敗，也顯示成功畫面讓用戶能手動關閉
-                showScreen('success-screen');
-            }
-        }
-
-        // 檢查執行環境
-        function checkEnvironment() {
-            const os = liff.getOS(); // 回傳 ios, android, web, mac, windows
-            const isInClient = liff.isInClient();
-
-            // 如果是桌機環境 (web/mac/windows) 或不在 LINE 客戶端內
-            if (os === 'web' || os === 'mac' || os === 'windows' || !isInClient) {
-                generateQRCode(LIFF_URL);
-                showScreen('qr-screen');
-            } else {
-                // 是手機 LINE 環境，載入表單
-                loadFilloutIframe();
-            }
-        }
-
-        // 載入 Fillout Iframe
-        async function loadFilloutIframe() {
-            // 雙重確認登入狀態
-            if (!liff.isLoggedIn()) {
-                liff.login();
-                return;
             }
 
-            try {
-                const profile = await liff.getProfile();
-                const userId = profile.userId;
-                
-                // 設定 Iframe 網址並帶入 userId
-                const iframe = document.getElementById('fillout-iframe');
-                iframe.src = `https://cicostudio.fillout.com/t/s2Q1z59UH1us?userid=${userId}`;
-                
-                // 顯示 Iframe，隱藏 Loading
-                iframe.style.display = 'block';
-                hideAllScreens(); // 隱藏所有滿版 overlay
-            } catch (error) {
-                console.error("無法獲取使用者資料", error);
+            function checkEnvironment() {
+                const os = liff.getOS(); 
+                const isInClient = liff.isInClient();
+
+                if (os === 'web' || os === 'mac' || os === 'windows' || !isInClient) {
+                    generateQRCode(LIFF_URL);
+                    showScreen('qr-screen');
+                } else {
+                    loadFilloutIframe();
+                }
             }
-        }
 
-        // --- UI 控制輔助函式 ---
-        function showScreen(screenId) {
-            document.getElementById('loading-screen').classList.add('hidden');
-            document.getElementById('qr-screen').classList.add('hidden');
-            document.getElementById('success-screen').classList.add('hidden');
-            
-            document.getElementById(screenId).classList.remove('hidden');
-        }
+            async function loadFilloutIframe() {
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                    return;
+                }
 
-        function hideAllScreens() {
-            document.getElementById('loading-screen').classList.add('hidden');
-            document.getElementById('qr-screen').classList.add('hidden');
-            document.getElementById('success-screen').classList.add('hidden');
-        }
+                try {
+                    const profile = await liff.getProfile();
+                    const userId = profile.userId;
+                    
+                    const iframe = document.getElementById('fillout-iframe');
+                    iframe.src = `https://cicostudio.fillout.com/t/s2Q1z59UH1us?userid=${userId}`;
+                    
+                    iframe.style.display = 'block';
+                    hideAllScreens(); 
+                } catch (error) {
+                    console.error("無法獲取使用者資料", error);
+                }
+            }
 
-        function generateQRCode(url) {
-            // 避免重複生成
-            document.getElementById("qrcode").innerHTML = "";
-            new QRCode(document.getElementById("qrcode"), {
-                text: url,
-                width: 180,
-                height: 180,
-                colorDark : "#000000",
-                colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.H
-            });
-        }
+            // --- UI 輔助函式 ---
+            function showScreen(screenId) {
+                document.getElementById('loading-screen').classList.add('hidden');
+                document.getElementById('qr-screen').classList.add('hidden');
+                document.getElementById('success-screen').classList.add('hidden');
+                document.getElementById(screenId).classList.remove('hidden');
+            }
 
-        // 啟動程式
-        main();
+            function hideAllScreens() {
+                document.getElementById('loading-screen').classList.add('hidden');
+                document.getElementById('qr-screen').classList.add('hidden');
+                document.getElementById('success-screen').classList.add('hidden');
+            }
+
+            function generateQRCode(url) {
+                document.getElementById("qrcode").innerHTML = "";
+                new QRCode(document.getElementById("qrcode"), {
+                    text: url, width: 180, height: 180,
+                    colorDark : "#000000", colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.H
+                });
+            }
+
+            // 執行主程式
+            main();
+        }
     </script>
 </body>
 </html>
