@@ -3,164 +3,130 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>凝聚｜首次體驗預約</title>
+  <title>凝聚｜體驗預約</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
   <style>
-    body { 
-      margin: 0; font-family: system-ui, -apple-system, sans-serif; 
-      background: #f8fafc; height: 100vh; overflow: hidden; 
+    /* 基礎重置，防止畫面滾動與彈性拉扯 (iOS 滑順關鍵) */
+    body, html { 
+      margin: 0; padding: 0; width: 100%; height: 100%; 
+      font-family: system-ui, -apple-system, sans-serif; 
+      background: #f8fafc; overflow: hidden; overscroll-behavior-y: none;
     }
-    
-    /* 滿版提示畫面 (處理中 / 成功) */
-    .screen { 
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-      background: #f8fafc; z-index: 50; 
-      display: none; flex-direction: column; align-items: center; justify-content: center; 
-      text-align: center; padding: 20px; box-sizing: border-box;
-    }
-    .screen.active { display: flex; animation: fadeIn 0.3s ease; }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-    /* 載入動畫 */
+    /* 頂層 Loading 遮罩 (預設顯示，直到初始化完成才淡出) */
+    #loadingOverlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: #f8fafc; z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: opacity 0.4s ease, visibility 0.4s ease;
+    }
+    #loadingOverlay.hidden {
+      opacity: 0; visibility: hidden;
+    }
+
+    /* 精緻的載入動畫 */
     .spinner { 
       width: 45px; height: 45px; border: 4px solid #e2e8f0; border-top: 4px solid #06c755; 
-      border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; 
+      border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 20px; 
     }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    .status-text { color: #64748b; font-size: 16px; font-weight: 500; }
+    .loading-text { color: #475569; font-size: 15px; font-weight: 500; letter-spacing: 1px; }
 
-    /* 成功圖示 */
-    .success-icon { 
-      width: 80px; height: 80px; background: #06c755; border-radius: 50%; 
-      display: flex; align-items: center; justify-content: center; margin-bottom: 20px; 
-      box-shadow: 0 10px 20px rgba(6,199,85,0.2); 
+    /* 主畫面容器 */
+    #appContainer {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      display: flex; flex-direction: column; opacity: 0; transition: opacity 0.5s ease;
     }
-    .success-icon svg { width: 40px; height: 40px; fill: white; }
-    h1 { font-size: 22px; color: #1e293b; margin: 0 0 12px; }
-    p { font-size: 15px; color: #64748b; margin: 0 0 32px; line-height: 1.6; }
+    #appContainer.ready { opacity: 1; }
 
-    /* 表單 Iframe */
-    #filloutFrame { 
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-      border: none; background: #fff; z-index: 10; display: none; 
+    /* 這裡放您的表單 Iframe，或者未來的自建 UI */
+    #mainFrame {
+      width: 100%; height: 100%; border: none; background: #fff;
     }
-    #filloutFrame.active { display: block; }
   </style>
 </head>
 <body>
 
-  <div id="loadingScreen" class="screen active">
+  <div id="loadingOverlay">
     <div class="spinner"></div>
-    <div class="status-text" id="loadingMsg">系統連線中...</div>
+    <div class="loading-text" id="loadingMsg">凝聚預約系統載入中...</div>
   </div>
 
-  <div id="successScreen" class="screen">
-    <div class="success-icon">
-      <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-    </div>
-    <h1>預約資料已送出！</h1>
-    <p>請於聊天室確認您的預約明細<br>小編將盡快與您聯繫</p>
+  <div id="appContainer">
+    <iframe id="mainFrame" title="預約表單"></iframe>
   </div>
-
-  <iframe id="filloutFrame" title="預約表單"></iframe>
 
   <script>
+    /***** 系統核心設定 *****/
     const LIFF_ID = "2001467446-KNVd49W2";
-    const LINE_OA_ID = "@biu5388t"; 
-    const FILL_OUT_BASE_URL = "https://cicostudio.fillout.com/t/s2Q1z59UH1us";
+    // Fillout 基礎網址
+    const FILL_OUT_BASE_URL = "https://cicostudio.fillout.com/t/s2Q1z59UH1us"; 
+    /***********************/
 
-    // 切換畫面邏輯
-    function switchScreen(screenId) {
-      document.getElementById('loadingScreen').classList.remove('active');
-      document.getElementById('successScreen').classList.remove('active');
-      document.getElementById('filloutFrame').classList.remove('active');
-      document.getElementById(screenId).classList.add('active');
+    // 取得 DOM 元素
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingMsg = document.getElementById('loadingMsg');
+    const appContainer = document.getElementById('appContainer');
+    const mainFrame = document.getElementById('mainFrame');
+
+    // 解除 Loading 遮罩
+    function hideLoading() {
+      appContainer.classList.add('ready');
+      loadingOverlay.classList.add('hidden');
     }
 
-    // 更新 Loading 文字
-    function setLoadingText(text) {
-      document.getElementById('loadingMsg').innerText = text;
-    }
-
-    // 備案機制：外部瀏覽器無法發送時，轉跳進入 LINE 官方帳號對話框
-    function fallbackToLineOA(messageText) {
-      const encodedText = encodeURIComponent(messageText);
-      window.location.replace(`https://line.me/R/oaMessage/${LINE_OA_ID}/?${encodedText}`);
-    }
-
-    async function main() {
+    async function initApp() {
       try {
+        // 1. 瞬間啟動 LIFF
         await liff.init({ liffId: LIFF_ID });
 
-        // 1. 抓取網址參數
-        const params = new URLSearchParams(window.location.search);
-        const action = params.get('action');
-
-        // 如果未登入，強制要求登入 (確保能抓到身分或傳送訊息)
+        // 2. 身份驗證攔截 (若未登入，立刻導向登入，完全不會閃爍)
         if (!liff.isLoggedIn()) {
+          loadingMsg.innerText = "正在驗證您的 LINE 帳號...";
           liff.login({ redirectUri: window.location.href });
-          return;
+          return; // 暫停執行，等待跳轉回來
         }
 
-        /* ＝＝＝＝＝ 模式 A：學員點擊了送出按鈕 (發送訊息) ＝＝＝＝＝ */
-        if (action === 'submit_done') {
-          setLoadingText("正在拋轉預約資料至 LINE...");
-
-          // 清洗與組合參數
-          const data = {
-              name: params.get('name') || "未提供",
-              phone: params.get('phone') || "未提供",
-              location: params.get('location') || "未指定",
-              trainer: params.get('trainer') || "未指定",
-              datetime: params.get('datetime') || "未指定",
-              referer: params.get('referer') || "無",
-              promocamp: params.get('promocamp') || "無"
-          };
-
-          const messageText = `【首次體驗預約資料】\n小編會盡快和您確認預約時段～\n\n．姓名： ${data.name}\n．電話： ${data.phone}\n．門市： ${data.location}\n．教練： ${data.trainer}\n．希望日期／時段： ${data.datetime}\n．介紹人： ${data.referer}\n．活動／優惠： ${data.promocamp}`;
-
-          if (liff.isInClient()) {
-              try {
-                  // 在 LINE 內部，靜默發送訊息
-                  await liff.sendMessages([{ type: 'text', text: messageText }]);
-                  switchScreen('successScreen');
-                  // 顯示成功畫面 2.5 秒後自動關閉，讓學員回到對話框
-                  setTimeout(() => liff.closeWindow(), 2500);
-              } catch (err) {
-                  console.warn("sendMessages 失敗，啟動備案:", err);
-                  fallbackToLineOA(messageText);
-              }
-          } else {
-              // 外部瀏覽器點開，喚起 LINE App
-              setLoadingText("正在為您開啟 LINE...");
-              fallbackToLineOA(messageText);
-          }
-          return;
-        }
-
-        /* ＝＝＝＝＝ 模式 B：剛進來預約，沒有參數 (顯示 Fillout 表單) ＝＝＝＝＝ */
         const profile = await liff.getProfile();
-        const url = new URL(FILL_OUT_BASE_URL);
-        // 把 UserId 偷塞進 Fillout 網址，這樣表單可以紀錄是誰填的 (若 Fillout 有設隱藏欄位 userid)
-        url.searchParams.set('userid', profile.userId); 
+
+        // 3. 核心：解析目前的網址 (模擬點餐系統的 OMO 路由邏輯)
+        // 假設顧客掃描的網址是: https://liff.line.me/ID/reserve/xitun?trainer=alex&source=qr
+        const path = window.location.pathname; // 取得 "/reserve/xitun"
+        const params = new URLSearchParams(window.location.search);
         
-        const iframe = document.getElementById('filloutFrame');
-        iframe.src = url.toString();
+        const storeId = path.split('/').pop() || "預設門市"; // 抓出 "xitun"
+        const trainer = params.get('trainer') || "";
+        const source = params.get('source') || "online";
+
+        // 4. 根據網址參數，動態組合出顧客專屬的表單 (或畫面)
+        loadingMsg.innerText = "正在準備您的專屬預約頁...";
         
-        // 等待 Iframe 載入完畢再切換，避免白畫面
-        iframe.onload = () => {
-           switchScreen('filloutFrame');
+        const targetUrl = new URL(FILL_OUT_BASE_URL);
+        targetUrl.searchParams.set('userid', profile.userId);
+        targetUrl.searchParams.set('name', profile.displayName); // 偷塞 LINE 暱稱讓學員少填一格
+        if (storeId !== "預設門市") targetUrl.searchParams.set('location', storeId);
+        if (trainer) targetUrl.searchParams.set('trainer', trainer);
+        if (source) targetUrl.searchParams.set('referer', source);
+
+        // 5. 載入內容並監聽完成事件
+        mainFrame.src = targetUrl.toString();
+        
+        mainFrame.onload = () => {
+          // 完美時機：Iframe 內容已經畫好，此時才把 Loading 遮罩拿掉！
+          // 這樣顧客完全看不到白畫面或載入過程，感覺就像 Native App。
+          hideLoading();
         };
 
-      } catch (err) {
-        console.error('LIFF 初始化失敗:', err);
-        setLoadingText("系統連線異常，請重新操作。");
+      } catch (error) {
+        console.error("系統啟動失敗", error);
+        loadingMsg.innerText = "系統連線異常，請重新整理頁面。";
+        loadingMsg.style.color = "#ef4444"; // 變紅色提示
       }
     }
 
-    // 啟動主程式
-    main();
+    // 程式進入點
+    initApp();
   </script>
 </body>
 </html>
