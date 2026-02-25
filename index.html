@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>首次體驗預約</title>
+    <title>凝聚運動顧問｜首次體驗預約</title>
     
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -48,29 +48,41 @@
             display: inline-block; transition: transform 0.2s ease, background-color 0.2s ease;
         }
         .btn:active { transform: scale(0.95); background-color: #05a044; }
+        
+        /* 錯誤按鈕專用樣式 (可稍微區分顏色，這裡使用深灰色/黑色增加警示感，或維持綠色也可) */
+        .btn-error { background-color: #333; }
+        .btn-error:active { background-color: #000; }
     </style>
 </head>
 <body>
 
     <div id="loading-screen" class="fullscreen-overlay">
         <div class="spinner"></div>
-        <p style="margin-top: 20px; color: #666;">系統處理中，請稍候...</p>
+        <p style="margin-top: 20px; color: #666;">Loading...</p>
     </div>
 
     <div id="qr-screen" class="fullscreen-overlay hidden">
         <div class="block-screen">
-            <h2>請使用手機 LINE 開啟</h2>
-            <p>為了提供完整的預約服務，<br>請使用手機相機掃描下方 QR Code，<br>或點擊下方按鈕前往。</p>
+            <h2>凝聚運動顧問｜首次體驗預約</h2>
+            <p>請使用手機相機掃描下方 QR Code，<br>或點擊下方按鈕前往。</p>
             <div id="qrcode"></div>
-            <a href="https://liff.line.me/2001467446-KNVd49W2" class="btn">前往 LINE 開啟</a>
+            <a href="https://liff.line.me/2001467446-KNVd49W2" class="btn">手機點此跳轉 LINE</a>
         </div>
     </div>
 
     <div id="success-screen" class="fullscreen-overlay hidden">
         <div class="block-screen">
-            <h2 style="color: #06C755;">資料已建立！</h2>
-            <p>正在為您跳轉至官方帳號...<br>請在聊天室中按下「送出」完成預約。</p>
-            <button class="btn" id="manual-redirect-btn">手動前往聊天室</button>
+            <h2 style="color: #06C755;">我們收到囉！</h2>
+            <p>正在跳轉至官方帳號...<br>請按「送出」預塡訊息，完成預約。</p>
+            <button class="btn" id="manual-redirect-btn">如無正確跳轉，點此手動前往</button>
+        </div>
+    </div>
+
+    <div id="error-screen" class="fullscreen-overlay hidden">
+        <div class="block-screen">
+            <h2 style="color: #FF5B5B;">Oops，好像有點問題喔？</h2>
+            <p>請點按鈕到 LINE 私訊小編</p>
+            <a href="https://line.me/R/ti/p/@biu5388t" class="btn btn-error">點我 LINE 凝聚小編</a>
         </div>
     </div>
 
@@ -85,7 +97,7 @@
         } else {
             const LIFF_ID = "2001467446-KNVd49W2";
             const LIFF_URL = `https://liff.line.me/${LIFF_ID}`;
-            const OA_ID = "@biu5388t"; // 您的官方帳號 ID
+            const OA_ID = "@biu5388t"; 
 
             async function main() {
                 try {
@@ -101,12 +113,12 @@
 
                 } catch (error) {
                     console.error("LIFF 初始化失敗", error);
-                    alert("系統連線異常，請確認網路狀態或稍後再試。");
+                    // 【修改】將 alert 改為顯示錯誤畫面
+                    showScreen('error-screen');
                 }
             }
 
             async function handleFormSubmit(params) {
-                // 檢查是否已送出過，避免重整造成無限迴圈
                 if (sessionStorage.getItem('message_sent') === 'true') {
                     showScreen('success-screen');
                     document.getElementById('manual-redirect-btn').onclick = () => liff.closeWindow();
@@ -114,7 +126,6 @@
                     return;
                 }
 
-                // 組合要發送的文字
                 const messageText = 
 `【首次體驗預約資料】
 ．姓名： ${params.get('name') || '未填寫'}
@@ -129,23 +140,17 @@
 
                 try {
                     if (liff.isInClient()) {
-                        // 寫入已發送標記
                         sessionStorage.setItem('message_sent', 'true');
                         
-                        // 將文字做 URL 編碼
                         const encodedMessage = encodeURIComponent(messageText);
-                        // 組裝跳轉至官方帳號的 Scheme URL
                         const redirectUrl = `https://line.me/R/oaMessage/${OA_ID}/?text=${encodedMessage}`;
                         
-                        // 顯示跳轉提示畫面 (避免畫面全白讓使用者疑惑)
                         showScreen('success-screen');
                         
-                        // 綁定手動按鈕 (以防自動跳轉被某些手機擋住)
                         document.getElementById('manual-redirect-btn').onclick = () => {
                             window.location.href = redirectUrl;
                         };
 
-                        // 延遲 0.5 秒後自動執行跳轉，讓使用者看清楚提示
                         setTimeout(() => {
                             window.location.href = redirectUrl;
                         }, 500);
@@ -155,7 +160,8 @@
                     }
                 } catch (error) {
                     console.error("處理跳轉失敗", error);
-                    alert("跳轉發生錯誤，請截圖聯繫客服：" + error.message);
+                    // 【修改】處理跳轉失敗時，也引導去找小編
+                    showScreen('error-screen');
                 }
             }
 
@@ -188,13 +194,19 @@
                     hideAllScreens(); 
                 } catch (error) {
                     console.error("無法獲取使用者資料", error);
+                    // 【修改】獲取資料失敗時，也顯示錯誤畫面
+                    showScreen('error-screen');
                 }
             }
 
+            // --- UI 輔助函式更新 ---
             function showScreen(screenId) {
+                // 確保切換畫面時，將包含錯誤畫面的所有 overlay 都先隱藏
                 document.getElementById('loading-screen').classList.add('hidden');
                 document.getElementById('qr-screen').classList.add('hidden');
                 document.getElementById('success-screen').classList.add('hidden');
+                document.getElementById('error-screen').classList.add('hidden');
+                
                 document.getElementById(screenId).classList.remove('hidden');
             }
 
@@ -202,6 +214,7 @@
                 document.getElementById('loading-screen').classList.add('hidden');
                 document.getElementById('qr-screen').classList.add('hidden');
                 document.getElementById('success-screen').classList.add('hidden');
+                document.getElementById('error-screen').classList.add('hidden');
             }
 
             function generateQRCode(url) {
