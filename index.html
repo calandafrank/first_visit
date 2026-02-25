@@ -67,7 +67,7 @@
             <p>請使用手機相機掃描下方 QR Code，<br>或點擊下方按鈕前往。</p>
             <div id="qrcode"></div>
             <a href="https://liff.line.me/2001467446-KNVd49W2" class="btn">手機點此跳轉 LINE</a>
-            <h5>如無法跳轉，請長按按鈕 ->「在 LINE 中打開」</h5>
+            <p>如無法跳轉，請長按按鈕 ->「在 LINE 中打開」</p>
         </div>
     </div>
 
@@ -129,15 +129,10 @@
 
                 const messageText = 
 `【首次體驗預約資料】
-．姓名： ${params.get('name') || '未填寫'}
-．電話： ${params.get('phone') || '未填寫'}
-
-．門市： ${params.get('location') || '未選擇'}
-．希望時段： ${params.get('datetime') || '未選擇'}
-．指名訓練師： ${params.get('trainer') || '無'}
-
-．活動優惠： ${params.get('promocamp') || '無'}
-．介紹人： ${params.get('referer') || '無'}`;
+ ${params.get('name') || '未填寫'} ｜ ${params.get('phone') || '未填寫'}
+ ${params.get('location') || '未選擇'} ｜ ${params.get('trainer') || '無'}
+ ${params.get('promocamp') || '無'} ｜ 介紹人 ${params.get('referer') || '無'}
+ 希望預約 ${params.get('datetime') || ''}`;
 
                 try {
                     if (liff.isInClient()) {
