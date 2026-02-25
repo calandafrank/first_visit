@@ -143,7 +143,7 @@
                         sessionStorage.setItem('message_sent', 'true');
                         
                         const encodedMessage = encodeURIComponent(messageText);
-                        const redirectUrl = `https://line.me/R/oaMessage/${OA_ID}/?text=${encodedMessage}`;
+                        const redirectUrl = `https://line.me/R/oaMessage/${OA_ID}/?${encodedMessage}`;
                         
                         showScreen('success-screen');
                         
