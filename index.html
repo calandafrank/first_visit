@@ -54,7 +54,7 @@
 
     <div id="loading-screen" class="fullscreen-overlay">
         <div class="spinner"></div>
-        <p style="margin-top: 20px; color: #666;">載入中，請稍候...</p>
+        <p style="margin-top: 20px; color: #666;">系統處理中，請稍候...</p>
     </div>
 
     <div id="qr-screen" class="fullscreen-overlay hidden">
@@ -68,9 +68,9 @@
 
     <div id="success-screen" class="fullscreen-overlay hidden">
         <div class="block-screen">
-            <h2 style="color: #06C755;">預約資料已送出！</h2>
-            <p>您現在可以關閉此視窗，<br>返回 LINE 聊天室查看您的預約明細。</p>
-            <button class="btn" onclick="liff.closeWindow()">關閉視窗</button>
+            <h2 style="color: #06C755;">資料已建立！</h2>
+            <p>正在為您跳轉至官方帳號...<br>請在聊天室中按下「送出」完成預約。</p>
+            <button class="btn" id="manual-redirect-btn">手動前往聊天室</button>
         </div>
     </div>
 
@@ -80,27 +80,23 @@
         // ==========================================
         // 1. 破窗防呆機制 (Frame-busting)
         // ==========================================
-        // 如果這個網頁發現自己被包在 Iframe 裡面 (例如 Fillout 跳轉回來時)
         if (window !== window.top) {
-            // 強制把最外層的視窗導向目前的帶參數網址
             window.top.location.href = window.location.href;
         } else {
-            // 確定在最外層後，才開始執行 LIFF 主程式
             const LIFF_ID = "2001467446-KNVd49W2";
             const LIFF_URL = `https://liff.line.me/${LIFF_ID}`;
+            const OA_ID = "@biu5388t"; // 您的官方帳號 ID
 
             async function main() {
                 try {
                     await liff.init({ liffId: LIFF_ID });
 
-                    // 檢查是否是從 Fillout 填完跳轉回來的
                     const urlParams = new URLSearchParams(window.location.search);
                     if (urlParams.get('action') === 'completed') {
                         await handleFormSubmit(urlParams);
-                        return; // 終止後續載入表單的動作
+                        return; 
                     }
 
-                    // 若非跳轉回來，則檢查環境 (判斷是否顯示 QR Code 或載入表單)
                     checkEnvironment();
 
                 } catch (error) {
@@ -110,12 +106,15 @@
             }
 
             async function handleFormSubmit(params) {
-                // 檢查 sessionStorage，避免使用者重整網頁導致無限發送訊息
+                // 檢查是否已送出過，避免重整造成無限迴圈
                 if (sessionStorage.getItem('message_sent') === 'true') {
                     showScreen('success-screen');
+                    document.getElementById('manual-redirect-btn').onclick = () => liff.closeWindow();
+                    document.getElementById('manual-redirect-btn').innerText = "關閉視窗";
                     return;
                 }
 
+                // 組合要發送的文字
                 const messageText = 
 `【首次體驗預約資料】
 ．姓名： ${params.get('name') || '未填寫'}
@@ -130,17 +129,33 @@
 
                 try {
                     if (liff.isInClient()) {
-                        await liff.sendMessages([{ type: "text", text: messageText }]);
+                        // 寫入已發送標記
                         sessionStorage.setItem('message_sent', 'true');
-                        liff.closeWindow();
+                        
+                        // 將文字做 URL 編碼
+                        const encodedMessage = encodeURIComponent(messageText);
+                        // 組裝跳轉至官方帳號的 Scheme URL
+                        const redirectUrl = `https://line.me/R/oaMessage/${OA_ID}/?text=${encodedMessage}`;
+                        
+                        // 顯示跳轉提示畫面 (避免畫面全白讓使用者疑惑)
+                        showScreen('success-screen');
+                        
+                        // 綁定手動按鈕 (以防自動跳轉被某些手機擋住)
+                        document.getElementById('manual-redirect-btn').onclick = () => {
+                            window.location.href = redirectUrl;
+                        };
+
+                        // 延遲 0.5 秒後自動執行跳轉，讓使用者看清楚提示
+                        setTimeout(() => {
+                            window.location.href = redirectUrl;
+                        }, 500);
+
                     } else {
                         showScreen('success-screen');
                     }
                 } catch (error) {
-                    console.error("發送訊息失敗", error);
-                    // 加入除錯提醒：通常是 LINE Developers 後台沒開 chat_message.write 權限
-                    alert("發送明細失敗，請開發者確認後台 chat_message.write 權限是否開啟。錯誤代碼：" + error.message);
-                    showScreen('success-screen');
+                    console.error("處理跳轉失敗", error);
+                    alert("跳轉發生錯誤，請截圖聯繫客服：" + error.message);
                 }
             }
 
@@ -176,7 +191,6 @@
                 }
             }
 
-            // --- UI 輔助函式 ---
             function showScreen(screenId) {
                 document.getElementById('loading-screen').classList.add('hidden');
                 document.getElementById('qr-screen').classList.add('hidden');
@@ -199,7 +213,6 @@
                 });
             }
 
-            // 執行主程式
             main();
         }
     </script>
