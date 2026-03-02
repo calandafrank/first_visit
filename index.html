@@ -128,11 +128,13 @@
                 }
 
                 const messageText = 
-`【首次體驗預約】
+`【首次體驗預約】請點右方送出 &#9205;
+　
  我是 ${params.get('name') || '未填寫'} ${params.get('phone') || '未填寫'}
- 預約 ${params.get('location') || '未選擇'} ${params.get('trainer') || '無'}
- 我要 ${params.get('promocamp') || '無'} （介紹人 ${params.get('referer') || '無'} ）
- 希望 ${params.get('datetime') || ''}`;
+ 　
+ &#128205; ${params.get('location') || '未選擇'} ${params.get('trainer') || '無'}
+ &#128172; ${params.get('promocamp') || '無'} （介紹人 ${params.get('referer') || '無'} ）
+ &#128467; ${params.get('datetime') || ''}`;
 
                 try {
                     if (liff.isInClient()) {
